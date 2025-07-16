@@ -5,3 +5,7 @@ matplotlib
 numpy
 scikit-image
 scipy
+geopandas
+scikit-image
+shapely
+
