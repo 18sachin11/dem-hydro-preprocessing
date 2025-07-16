@@ -1,7 +1,7 @@
 streamlit
-whitebox
+richdem
 rasterio
-numpy
 matplotlib
-folium
-streamlit-folium
+numpy
+scikit-image
+scipy
