@@ -9,3 +9,5 @@ geopandas
 shapely
 fiona
 pyproj
+whitebox
+
