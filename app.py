@@ -8,6 +8,8 @@ import richdem as rd
 import matplotlib.pyplot as plt
 from skimage import measure
 from scipy.ndimage import label
+import geopandas as gpd
+from shapely.geometry import Polygon, LineString
 
 st.set_page_config(layout="wide")
 st.title("DEM Hydro-Preprocessing with RichDEM")
@@ -82,6 +84,36 @@ if uploaded_file is not None:
                 dst.write(array.astype(np.float32), 1)
         return out_path
 
+    def raster_to_polygons(raster_array, transform):
+        shapes = measure.find_contours(raster_array, 0.5)
+        polygons = []
+        for shape in shapes:
+            coords = [(transform[2] + x * transform[0], transform[5] + y * transform[4]) for y, x in shape]
+            poly = LineString(coords)
+            polygons.append(poly)
+        return polygons
+
+    with rasterio.open(dem_path) as src:
+        transform = src.transform
+        crs = src.crs
+
+    # Convert Stream Raster to LineString shapefile
+    stream_shapes = raster_to_polygons(stream_network, transform)
+    stream_gdf = gpd.GeoDataFrame(geometry=stream_shapes, crs=crs)
+    stream_shp = os.path.join(temp_dir, 'streams.shp')
+    stream_gdf.to_file(stream_shp)
+
+    # Convert Watershed Raster to Polygon shapefile
+    watershed_shapes = measure.label(labeled_array, background=0)
+    watershed_gdf = gpd.GeoDataFrame(geometry=[], crs=crs)
+    for region in measure.regionprops(watershed_shapes):
+        coords = region.coords
+        points = [(transform[2] + x * transform[0], transform[5] + y * transform[4]) for y, x in coords]
+        poly = Polygon(points)
+        watershed_gdf = watershed_gdf.append({'geometry': poly}, ignore_index=True)
+    watershed_shp = os.path.join(temp_dir, 'watersheds.shp')
+    watershed_gdf.to_file(watershed_shp)
+
     filled_path = save_raster(filled_dem, dem_path, 'filled_dem.tif')
     acc_path = save_raster(flow_acc, dem_path, 'flow_acc.tif')
     stream_path = save_raster(stream_network, dem_path, 'streams.tif')
@@ -90,8 +122,10 @@ if uploaded_file is not None:
     st.subheader("📥 Download Results")
     st.download_button("Download Filled DEM", open(filled_path, 'rb').read(), file_name='filled_dem.tif')
     st.download_button("Download Flow Accumulation", open(acc_path, 'rb').read(), file_name='flow_acc.tif')
-    st.download_button("Download Stream Network", open(stream_path, 'rb').read(), file_name='streams.tif')
-    st.download_button("Download Watersheds", open(watershed_path, 'rb').read(), file_name='watersheds.tif')
+    st.download_button("Download Stream Network (Raster)", open(stream_path, 'rb').read(), file_name='streams.tif')
+    st.download_button("Download Watersheds (Raster)", open(watershed_path, 'rb').read(), file_name='watersheds.tif')
+    st.download_button("Download Stream Network (Shapefile .shp)", open(stream_shp, 'rb').read(), file_name='streams.shp')
+    st.download_button("Download Watersheds (Shapefile .shp)", open(watershed_shp, 'rb').read(), file_name='watersheds.shp')
 
 else:
     st.info("Upload a DEM to begin hydrological preprocessing using RichDEM.")
