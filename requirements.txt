@@ -1,2 +1,7 @@
 streamlit
 whitebox
+rasterio
+numpy
+matplotlib
+folium
+streamlit-folium
